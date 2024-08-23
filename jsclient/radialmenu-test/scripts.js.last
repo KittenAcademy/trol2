@@ -1,0 +1,42 @@
+function showOptions(event) {
+    const optionsContainer = document.getElementById('optionsContainer');
+    const rect = event.target.getBoundingClientRect();
+    const x = rect.left + window.scrollX + rect.width / 2;
+    const y = rect.top + window.scrollY + rect.height / 2;
+
+    const radius = 150; // Radius for the radial arrangement
+    const options = document.querySelectorAll('.option');
+    const angleStep = 360 / options.length;
+
+    options.forEach((option, index) => {
+        const angle = angleStep * index;
+        const optionX = x + radius * Math.cos(angle * (Math.PI / 180)) - option.offsetWidth / 2;
+        const optionY = y + radius * Math.sin(angle * (Math.PI / 180)) - option.offsetHeight / 2;
+
+        // Adjust position to stay within the window boundaries
+        const adjustedX = Math.min(Math.max(optionX, 0), window.innerWidth - option.offsetWidth);
+        const adjustedY = Math.min(Math.max(optionY, 0), window.innerHeight - option.offsetHeight);
+
+        option.style.left = `${adjustedX}px`;
+        option.style.top = `${adjustedY}px`;
+    });
+
+    optionsContainer.classList.toggle('hidden');
+    setTimeout(() => {
+        optionsContainer.style.opacity = optionsContainer.style.opacity == '1' ? '0' : '1';
+    }, 0);
+}
+
+function optionSelected(option, divId) {
+    console.log(`Option selected: ${option} from div: ${divId}`);
+    // Your custom function can be called here
+    // customFunction(option, divId);
+
+    // Hide options after selection
+    const optionsContainer = document.getElementById('optionsContainer');
+    optionsContainer.style.opacity = '0';
+    setTimeout(() => {
+        optionsContainer.classList.add('hidden');
+    }, 300);
+}
+

@@ -1,0 +1,159 @@
+######################################
+#  MQTT
+mqtt:
+  host: localhost
+  port: 1883
+  username: trol
+  password: ""
+
+# The root topic that all our topics in MQTT will be under.
+# i.e. cameras go in {mqtt_root}/cameras
+mqtt_root: trol
+
+#######################################
+# Cameras
+# Username and password used as default for cameras, can be overridden per-camera elsewhere
+camera_user: admin
+camera_pass: ""
+# The size of images to use for camera previews within trol
+thumbnail_width: 240
+thumbnail_height: 135
+# How close does a ptz position need to be to be considered the same position
+ptz_position_tolerance: 0.1
+
+#######################################
+# trol stuff
+#
+# Used by OBS and Discord to shorten source names in OBS for Discord users.
+# i.e. the source named 'TROL TR' is referred to as just 'TR' in Discord bot use.
+# Can be set to "" to not use this feature.
+legacy_position_prefix: "TROL "
+
+# How long position is locked after a camera change by root (users of jsclient or Android client)
+root_camlock_duration: 20
+# How long position is locked after a camera change by admins (Discord users with 'trolrol' Role)
+admin_camlock_duration: 120
+
+# Map OBS position names to human strings.
+nice_position_names:
+  "TROL TR": "Top Right"
+  "TROL TL": "Top Left"
+  "TROL B": "Bottom"
+  "TROL A1": "First Audio"
+  "TROL A2": "Second Audio"
+
+# A camera that shows nothing used to turn off a position or audio
+null_camera_name: "null"
+
+# Autocam automatically broadcasts in the given position
+# When the camera(s) named in autocam_dict are accessable
+# (It uses the camera's audio settings configured elsewhere to determine whether to use the audio)
+autocam_audio_position: "TROL A1"
+autocam_dict:
+  scribphone:
+    position: "TROL TR"
+
+######################################
+# OBS
+obs:
+  host: "localhost"
+  port: 4455
+  password: "123456"
+  # Log stream stats every x seconds
+  stats_log_interval: 60
+
+  # This file is used to configure the scene at startup or when a refresh is requested
+  scene_yaml_file: config/obs-scene.yaml
+  # This is the OBS settings to apply to make a position fullscreen.
+  fullscreen_transform:
+    sceneItemTransform:
+      boundsAlignment: 5
+      boundsType: OBS_BOUNDS_SCALE_INNER
+      boundsHeight: 2160.0
+      boundsWidth: 3840.0
+      positionX: 0
+      positionY: 0
+      cropBottom: 0
+      cropLeft: 0
+      cropRight: 0
+      cropToBounds: false
+      cropTop: 0
+    sceneItemIndex: 5
+
+
+########################################
+# Discord
+discord:
+  botkey: ""
+  # Channel for bot admins/private info
+  admin_channel: 123412341234123412 
+  # Channel for general public/voting
+  user_channel: 123412341234123412
+  # Users with this role on Discord are considered admins
+  admin_role: "trol user"
+
+  voting:
+    # How long to allow votes
+    duration: 60
+    # How long to display votes
+    display_duration: 90
+    # Automatically poll the users
+    enable_autopoll: True
+    # trol will not automatically poll if an admin has used ANY bot command
+    # within this time period
+    admin_inactivity_period: 300
+    # How frequently to attempt to poll automatically
+    poll_interval: 300
+    # Only these positions allowed for user camera voting
+    # does not apply to admins
+    positions:
+      - "TROL TR"
+      - "TROL TL"
+      - "TROL B"
+    # Only these cameras allowed in these positions for users
+    # does not apply to admins
+    voting_camera_limits:
+      "TROL TR":
+        - "zoom1"
+        - "zoom2"
+        - "zoom3"
+        - "zoom4"
+        - "zoom5"
+        - "zoom6"
+        - "zoom7"
+        - "zoom8"
+        - "sunroom"
+        - "dining"
+        - "kitchen"
+        - "den"
+        - "entry"
+        - "annex"
+        - "boxcam"
+        - "stairs"
+        - "hall"
+        - "mainceiling"
+      "TROL TL":
+        - "zoom1"
+        - "zoom2"
+        - "zoom3"
+        - "zoom4"
+        - "zoom5"
+        - "zoom6"
+        - "zoom7"
+        - "zoom8"
+        - "sunroom"
+        - "dining"
+        - "kitchen"
+        - "den"
+        - "entry"
+        - "annex"
+        - "boxcam"
+        - "stairs"
+        - "hall"
+        - "mainceiling"
+      "TROL B":
+        - "4k1"
+        - "4k2"
+        - "4k3"
+        - "4k4"
+        - "4k5"

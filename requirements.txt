@@ -1,0 +1,13 @@
+paho-mqtt==1.6.1
+pydantic==2.8.0
+pydantic-settings
+PyYAML
+Pillow==8.4.0
+requests
+discord.py
+imageio
+ffmpeg-python
+onvif-zeep==0.2.12
+moviepy
+argcomplete
+obs-websocket-py

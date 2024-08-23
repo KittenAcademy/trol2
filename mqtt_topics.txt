@@ -1,0 +1,59 @@
+Known Topics:
+Topic message format is:  plain string for scalar values, json for dict/list values.
+Assuming root topic is 'trol':
+
+CAMERA DATA:
+trol/commands/camera                 = Communication channel for use of CameraCommands(MQTTCommands) class
+trol/cameras                         = list of camera names.
+trol/cameras/$CAMERANAME/type        = brand of camera e.g. "LOREX", "AMCREST" etc.
+trol/cameras/$CAMERANAME/address     = DNS name or IP address
+trol/cameras/$CAMERANAME/rtspurl     = URL for RTSP stream
+trol/cameras/$CAMERANAME/jpgurl      = URL for screenshot (may be rtsp:// to pull from stream)
+trol/cameras/$CAMERANAME/audiourl    = URL for audio stream (may include low-res low-fps video)
+trol/cameras/$CAMERANAME/noaudio     = Boolean, camera is disallowed from audio use
+trol/cameras/$CAMERANAME/ispublic    = Boolean, camera is accessable to Discord admins 
+trol/cameras/$CAMERANAME/ishidden    = Boolean, camera is hidden from Discord users
+trol/cameras/$CAMERANAME/nice_name   = For display to users who can't cope with the truth
+SCREENSHOT/THUMBNAILS:  (Terms are used to mean the same thing currently)
+trol/cameras/$CAMERANAME/nothumb     = Boolean, camera is disallowed from getting screenshots
+trol/cameras/$CAMERANAME/failure_count = Int, number of consecutive failures or '0' if not currently failing.
+trol/cameras/$CAMERANAME/last_screenshot_timestamp = ISO Timestamp of last successful screenshot
+trol/cameras/$CAMERANAME/screenshot  = String, base-64 encoded jpg screenshot
+trol/cameras/$CAMERANAME/error_message = Last error from camera when getting screenshot
+PTZ:
+trol/cameras/$CAMERANAME/prior_ptz_positions = List, coordinates of PTZ. [tuple(x:float,y:float,z:float), ...]
+trol/cameras/$CAMERANAME/known_ptz_positions = Dictionary, {position_name: tuple(x:float,y:float,z:float), ...}
+trol/cameras/$CAMERANAME/ptz_locked          = String, is user level that locked the camera: None/'Discord user' or 'admin' or 'root'
+trol/cameras/$CAMERANAME/ptz_arrived = dict of info on a camera sent by handlePTZ after a move.  {coords: (x,y,z), screenshot: b64-encoded str}
+#DEPRECATED:
+#trol/cameras/$CAMERANAME/ptz_positions = List of names of stored PTZ positions.
+#trol/cameras/$CAMERANAME/goto_ptz_number = Int, request movement to stored PTZ position
+#trol/cameras/$CAMERANAME/goto_ptz_coords = List, x,y,z coordinates to move to
+#trol/cameras/$CAMERANAME/$PTZPOSITIONNAME/number = Int, PTZ position number the camera uses
+#trol/cameras/$CAMERANAME/$PTZPOSITIONNAME/ispublic = Boolean, PTZ position is accessable to Discord users
+
+
+POSITION DATA:
+  Represents a "Source" in OBS (i.e. a position on-screen to show a camera stream)
+trol/positions                             = list of position names
+trol/positions/$POSITIONNAME/active        = Name of camera currently shown in this position (Do not write to this, it's set by OBS)
+trol/positions/$POSITIONNAME/requested     = Name of camera selected to show in this position (Do write to this if you want OBS to switch)
+trol/positions/$POSITIONNAME/isaudio       = Boolean, position is audio-only
+trol/positions/$POSITIONNAME/locked_until  = integer unix time, disallows position changes 
+trol/positions/$POSITIONNAME/lock_level    = 'admin' or 'root' 
+trol/positions/$POSITIONNAME/obs_item_default = JSON object containing all the settings needed to create this position in OBS (see obs/functions.py)
+trol/positions/$POSITIONNAME/nice_name     = For display to users who can't cope with the truth
+
+
+OBS DATA:
+trol/obs/command             = Channel for use of OBSCommands(MQTTCommands)
+trol/obs/stats               = dict, Stream health info
+trol/obs/arewelive           = boolean, are we streaming
+trol/obs/is_recording        = boolean, are we recording
+trol/obs/last_recording_filename = The filename of the last recording finished, NOT whatever we are recording now
+
+NEWSTICKER DATA:
+   The on-screen news ticker, displayed every quarter-hour.
+trol/scroll/isactive      = Boolean, is currently displayed (set True or False to display or hide)
+trol/scroll/newsticker    = String, the text displayed on the news ticker
+

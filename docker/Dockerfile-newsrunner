@@ -1,0 +1,2 @@
+FROM trol2base:temporary
+ENTRYPOINT ["trol-newsrunner"]

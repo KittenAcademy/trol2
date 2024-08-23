@@ -1,0 +1,38 @@
+name: "TROL A2"
+nice_name: Audio Two
+isaudio: true
+obs_item_default:
+  inputAudioSyncOffset: 0
+  inputKind: ffmpeg_source
+  inputMuted: false
+  inputName: TROL A2
+  inputSettings:
+    buffering_mb: 1
+    close_when_inactive: true
+    ffmpeg_options: rtps_transport=tcp rtsp_flags=prefer_tcp
+    hw_decode: true
+    is_local_file: false
+  inputVolumeMul: 0.6302061676979065
+  sceneItemBlendMode: OBS_BLEND_NORMAL
+  sceneItemEnabled: true
+  sceneItemIndex: 0
+  sceneItemLocked: true
+  sceneItemTransform:
+    alignment: 5
+    cropBottom: 0
+    cropLeft: 0
+    cropRight: 0
+    cropToBounds: false
+    cropTop: 0
+    height: 1440.0
+    positionX: 0.0
+    positionY: 0.0
+    rotation: 0.0
+    scaleX: 1.0
+    scaleY: 1.0
+    sourceHeight: 1440.0
+    sourceWidth: 2560.0
+    width: 2560.0
+  sourceName: TROL A2
+  sourceType: OBS_SOURCE_TYPE_INPUT
+

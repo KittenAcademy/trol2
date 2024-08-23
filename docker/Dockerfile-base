@@ -1,0 +1,31 @@
+# Dockerfile.base
+FROM python:3.9-slim
+
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libssl-dev \
+    libffi-dev \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -d /app -g appuser -m -s /bin/bash appuser
+
+COPY . /app
+RUN chown -R appuser:appuser /app
+USER appuser
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+RUN rm -fr venv
+ENV PATH="/app/.local/bin:$PATH"
+RUN python -m pip install --upgrade pip 
+
+RUN pip install -r obs-websocket-py/requirements.txt
+RUN pip install obs-websocket-py
+RUN pip install -r requirements.txt
+RUN pip install .
+

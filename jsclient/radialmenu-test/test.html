@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Around Div</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="mainDiv" class="circle" onclick="showOptions(event)">Click Me</div>
+    <div id="optionsContainer" class="options-container hidden">
+        <div class="option" onclick="optionSelected('Option 1', 'mainDiv')">
+            <img src="image1.png" alt="Option 1"><br>Option 1
+        </div>
+        <div class="option" onclick="optionSelected('Option 2', 'mainDiv')">
+            <img src="image2.png" alt="Option 2"><br>Option 2
+        </div>
+        <div class="option" onclick="optionSelected('Option 3', 'mainDiv')">
+            <img src="image3.png" alt="Option 3"><br>Option 3
+        </div>
+        <div class="option" onclick="optionSelected('Option 4', 'mainDiv')">
+            <img src="image4.png" alt="Option 4"><br>Option 4
+        </div> 
+        <div class="option" onclick="optionSelected('Option 5', 'mainDiv')">
+            <img src="image5.png" alt="Option 5"><br>Option 4
+        </div> 
+    </div>
+    <script src="scripts.js"></script>
+</body>
+</html>
+

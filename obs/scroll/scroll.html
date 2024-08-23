@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scrolling Text Ticker</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.5); /* Optional background for the page */
+    }
+    #ticker {
+      display: inline-block;
+		font-family: arial;
+		font-size: 90px;
+		color: lightgray; 
+		border-radius: 30px; 
+		padding: 20px 20px; 
+      text-shadow:
+                  -3px -3px 0 #000,
+                   3px -3px 0 #000,
+                  -3px  3px 0 #000,
+                   3px  3px 0 #000;
+
+      background-color: rgba(0, 0, 0, 0.75);
+      overflow: hidden;
+      white-space: nowrap;
+      box-sizing: border-box;
+      width: 2700px; /* Fixed width of the ticker */
+      height: 150px; /* Fixed height of the ticker */
+      position: relative;
+    }
+    #ticker span {
+      position: absolute;
+      white-space: nowrap;
+      will-change: transform;
+    }
+  </style>
+</head>
+<body>
+  <div id="ticker">
+    <span id="ticker-text"></span>
+  </div>
+
+  <script src="./mqtt.min.js"></script>
+  <script src="./mqtt-auth.js"></script>
+
+  <script>
+    const tickerText = document.getElementById('ticker-text');
+
+    function setScrollAnimation() {
+      const ticker = document.getElementById('ticker');
+      const textWidth = tickerText.offsetWidth;
+      const containerWidth = ticker.offsetWidth;
+
+      const duration = textWidth / 100; // Adjust speed based on text width
+      const keyframes = `
+        @keyframes scroll {
+          from { transform: translateX(${containerWidth}px); }
+          to { transform: translateX(-${textWidth}px); }
+        }
+      `;
+      const styleSheet = document.styleSheets[0];
+      styleSheet.insertRule(keyframes, styleSheet.cssRules.length);
+
+      tickerText.style.animation = `scroll ${duration}s linear infinite`;
+    }
+
+    // Set default scroll animation
+    // setScrollAnimation();
+
+    console.log("Creating mqtt client.")
+    // Connect to MQTT
+    const client = mqtt.connect(mqtt_url, mqtt_auth);
+
+    client.on('connect', function () {
+      client.subscribe(scroll_topic, function (err) {
+        if (!err) {
+          console.log('Subscribed to topic:', scroll_topic);
+        }
+      });
+    });
+
+    client.on('message', function (topic, message) {
+      // message is Buffer
+      tickerText.textContent = message.toString();
+      console.log("Got ticker text: " + message.toString());
+      setScrollAnimation();
+    });
+
+
+  </script>
+</body>
+</html>
+
