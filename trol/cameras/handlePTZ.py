@@ -37,11 +37,15 @@ def getConnection(camera):
     url = urlparse(camera.rtspurl)
     # TODO: Don't log username/passwords!
     # log.debug(f"Connecting to {url.hostname} with username {url.username}")
-    ptz_service, media_service, profiles, token = get_service_and_token(get_credentials(camera))
+    host, port, user, password = get_credentials(camera._name)
+    ptz_service, media_service, profiles, token = get_service_and_token(host, port, user, password )
     return ptz_service, token
 
 def get_credentials(camera_name: str):
     camera = cameras.getByName(camera_name)
+    if camera is None:
+        log.error(f"Couldn't get camera: {camera_name}")
+
     url = urlparse(camera.rtspurl)
     return (url.hostname, 80, url.username, url.password)
 
@@ -49,7 +53,7 @@ def getCurrentPosition(camera, ptz_service=None, token=None):
     url = urlparse(camera.rtspurl)
     try:
         if ptz_service is None or token is None:
-            ptz_service, _, token = getConnection(camera)
+            ptz_service, token = getConnection(camera)
         position = get_current_position(ptz_service, token)
     except Exception as e:
         stack_trace = traceback.format_exc()
@@ -95,7 +99,7 @@ def handle_goto_number(camera_name, position_number=None):
         if position_number < 0:
             handle_go_back(camera, position_number)
             return
-        ptz_service, _, _, token = getConnection(camera)
+        ptz_service, token = getConnection(camera)
         add_position_to_undo_stack(camera, ptz_service=ptz_service, token=token)
         move_to_stored_position(ptz_service, token, position_number, callback = lambda coords, c=camera, s=ptz_service, t=token: report_position_arrival(c, coords, s, t))
     except Exception as e:
@@ -107,7 +111,7 @@ def handle_goto_coords(camera_name, coords=None, ptz_service=None, token=None):
     try:
         camera = cameras.getByName(camera_name)
         if ptz_service is None or token is None:
-            ptz_service, _, _, token = getConnection(camera)
+            ptz_service, token = getConnection(camera)
         add_position_to_undo_stack(camera, ptz_service=ptz_service, token=token)
         log.debug(f"Handling request for {camera_name} to xyz {coords}")
         move_to_position(ptz_service, token, coords, callback = lambda coords, c=camera, s=ptz_service, t=token: report_position_arrival(c, coords, s, t))
@@ -118,7 +122,7 @@ def handle_goto_coords(camera_name, coords=None, ptz_service=None, token=None):
 def handle_vector_move(camera_name, vector):
     log.debug(f"Got request for relative move to {vector} for {camera_name}")
     camera = cameras.getByName(camera_name)
-    ptz_service, _, _, token = getConnection(camera)
+    ptz_service, token = getConnection(camera)
     add_position_to_undo_stack(camera, ptz_service=ptz_service, token=token)
     relative_move(ptz_service, token, vector, callback = lambda coords, c=camera, s=ptz_service, t=token: report_position_arrival(c, coords, s, t))
 

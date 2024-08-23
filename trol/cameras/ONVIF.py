@@ -112,7 +112,7 @@ def store_current_position_as_preset(ptz_service, token, preset_name):
 
 # TODO: add/move this to screenshot.py in an accessable way
 def get_screenshot(camera_ip, port, username, password):
-    _, media_service, profiles, token = get_service_and_token(*args, **args)
+    _, media_service, profiles, token = get_service_and_token(camera_ip, port, username, password);
     snapshot_uri = media_service.GetSnapshotUri({'ProfileToken': profiles[0].token}).Uri
     # Download the image
     response = requests.get(snapshot_uri, auth=HTTPDigestAuth(username, password),timeout=10)

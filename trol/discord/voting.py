@@ -6,6 +6,8 @@ from .common import onlyChannel, trolRol, send_to_channel, requestCameraInPositi
 from io import BytesIO
 from base64 import b64decode
 from time import time
+from datetime import datetime
+
 from PIL import Image, ImageDraw, ImageFont
 from traceback import format_exc
 
@@ -16,7 +18,7 @@ set_debug(log)
 
 
 class CamVotingMenu(discord.ui.Select):
-    def __init__(self, options, vote_storage):
+    def __init__(self, options, vote_storage, nice_name_map):
         super().__init__(
             placeholder="Choose one or more options...",
             min_values=1,
@@ -24,6 +26,7 @@ class CamVotingMenu(discord.ui.Select):
             options=options,
         )
         self.vote_storage = vote_storage
+        self.nice_name_map = nice_name_map
 
     async def callback(self, interaction: discord.Interaction):
         selected_options = self.values
@@ -32,13 +35,14 @@ class CamVotingMenu(discord.ui.Select):
         # Store the latest selections of the user
         self.vote_storage[user_id] = selected_options
         log.debug(f"{interaction.user.name} selected {selected_options}")
-        await interaction.response.send_message(f"You selected: {', '.join(selected_options)}", ephemeral=True)
+        nice_selected_options = [self.nice_name_map[camname] for camname in selected_options]
+        await interaction.response.send_message(f"You selected: {', '.join(nice_selected_options)}", ephemeral=True)
 
 class CamVotingView(discord.ui.View):
-    def __init__(self, options, vote_storage):
+    def __init__(self, options, vote_storage, nice_name_map):
         super().__init__()
         self.vote_storage = vote_storage
-        self.menu = CamVotingMenu(options, vote_storage)
+        self.menu = CamVotingMenu(options, vote_storage, nice_name_map)
         self.add_item(self.menu)
 
 def create_image_grid(images, text_labels, font_size = 25):
@@ -83,7 +87,7 @@ async def get_ctx_from_channel(bot, channel: discord.TextChannel):
 
 def get_time_strings(epoch_time):
 
-    interval = time() - epoch_time
+    interval = epoch_time - time() 
 
     # Human-readable amount of time (since the epoch)
     total_seconds = int(interval)
@@ -92,10 +96,16 @@ def get_time_strings(epoch_time):
     days, hours = divmod(hours, 24)
 
     #human_readable_time = f"{days} days, {hours} hours, {minutes} minutes, {seconds} seconds"
-    human_readable_time = f"{minutes} minutes, {seconds} seconds"
+    human_readable_time = ""
+    if minutes:
+        human_readable_time = f"{minutes} minutes, {seconds} seconds"
+    else:
+        human_readable_time = f"{seconds} seconds"
+
 
     # Formatted clock time in YYYY-MM-DD HH:MM:SS for the current timezone
-    formatted_time = datetime.fromtimestamp(epoch_time).strftime('%Y-%m-%d %H:%M:%S')
+    # formatted_time = datetime.fromtimestamp(epoch_time).strftime('%Y-%m-%d %H:%M:%S')
+    formatted_time = datetime.fromtimestamp(epoch_time).strftime('%H:%M:%S')
 
     return formatted_time, human_readable_time
 
@@ -116,7 +126,6 @@ class VotingCog(commands.Cog):
         return message
 
     def get_next_poll_time(self):
-        now = time()
         # Determine whether the next poll is at the scheduled time or at a later time because admins are active:
         nominal_poll_time = self.last_auto_poll + self.bot.settings.discord.voting.poll_interval
         admin_poll_delay_time = self.bot.last_admin_activity + self.bot.settings.discord.voting.admin_inactivity_period
@@ -126,40 +135,49 @@ class VotingCog(commands.Cog):
 
 
     async def update_auto_poll_message(self):
-        if self.poll_active:
-            return
+        try:
+            if self.poll_active:
+                return
 
-        now = time()
-        next_poll_time = self.get_next_poll_time()
-        time_until_poll = now - next_poll_time
+            now = time()
+            next_poll_time = self.get_next_poll_time()
+            time_until_poll = next_poll_time - now
 
-        message = ""
+            message = ""
 
-        if self.bot.settings.discord.voting.enable_autopoll:
-            if time_until_poll >= 0: 
-                time_string, human_time_string = get_time_strings(next_poll_time)
-                message = f"Next camera selection scheduled at {time_string}\nT-minus {human_time_string}\n(NOTE: Scheduled time will frequently be pushed back.  Poll time not guaranteed.)\n\n"
+            if self.bot.settings.discord.voting.enable_autopoll:
+                if time_until_poll >= 0: 
+                    time_string, human_time_string = get_time_strings(next_poll_time)
+                    message = f"Next camera selection in {human_time_string} at {time_string}\n(NOTE: Scheduled time will frequently be pushed back.  Poll time not guaranteed.)\n\n"
+                else:
+                    message = f"Next camera selection imminent!\n\n\n"
             else:
-                message = f"Next camera selection imminent!\n\n\n\n"
-        else:
-            message = "Camera selection is currently offline.\n\n\n\n"
+                message = "Camera selection is currently offline.\n\n\n"
 
-        message += f"Current cameras:\n"
-        for position_name in self.bot.settings.discord.voting.positions:
-            position = self.bot.positions.getByName(position_name)
-            nice_position_name = position.nice_name
-            nice_camera_name = self.bot.cameras.getByName(position.active).nice_name
-            message += f"{nice_position_name}: {nice_camera_name}\n"
+            message += f"Current cameras:\n"
+            for position_name in self.bot.settings.discord.voting.positions:
+                position = self.bot.positions.getByName(position_name)
+                nice_position_name = position.nice_name
+                nice_camera_name = self.bot.cameras.getByName(position.active).nice_name
+                message += f"{nice_position_name}: {nice_camera_name}\n"
 
-        if self.auto_poll_status_message is None:
-            self.auto_poll_status_message = await self.make_user_channel_message(message)
-        else:
-            await self.auto_poll_status_message.edit(content=message)
+            if self.auto_poll_status_message is None:
+                self.auto_poll_status_message = await self.make_user_channel_message(message)
+            else:
+                await self.auto_poll_status_message.edit(content=message)
+        except Exception as e:
+            log.error(f"Caught exception {e}: \n{format_exc()}")
+
+
 
     @tasks.loop(seconds=10) 
     async def auto_poll_cameras(self):
         await self.bot.wait_until_ready()
         try:
+
+            if self.poll_active:
+                return
+
             await self.update_auto_poll_message()
             
             channel = self.bot.get_channel(int(self.bot.settings.discord.user_channel))
@@ -171,15 +189,15 @@ class VotingCog(commands.Cog):
                 # log.debug("Not autopolling because autopoll is not enabled.")
                 return
 
-            now - time()
+            now = time()
             next_poll_time = self.get_next_poll_time()
-            time_until_poll = now - next_poll_time
+            time_until_poll = next_poll_time - now
 
             if now < next_poll_time:
                 if time_until_poll < 15.0:
                     self.auto_poll_cameras.change_interval(seconds=1)
                 time_string, human_time_string = get_time_strings(next_poll_time)
-                # log.debug(f"Not autopolling for {human_time_string}")
+                # log.debug(f"Not autopolling for {human_time_string} at {time_string}")
                 return
             
             log.debug("Beginning poll.")
@@ -289,10 +307,12 @@ class VotingCog(commands.Cog):
         vote_storage = {}
 
         # Post the vote
+        nice_name_map = {camera_name: self.bot.cameras.getByName(camera_name).nice_name for camera_name in cameras_touse}
         vote_view = CamVotingView(self.getCamVotingOptions(eligible_cameras = cameras_touse, 
                                                            selected_cameras = pre_selected_cameras,
                                                            access_level=access_level ),
-                                  vote_storage )
+                                  vote_storage,
+                                  nice_name_map)
 
         self.poll_active = True
         message = await ctx.send(embed=embed, 
@@ -367,7 +387,8 @@ class VotingCog(commands.Cog):
                     results_message = f"Top 5 results so far:\n"
                     for cam, count in sorted_votes:
                         percentage = (count / total_votes) * 100
-                        results_message += f"{cam}: {percentage:.2f}% of votes\n"
+                        cam_nice_name = self.camera_name_to_nice_name(cam)
+                        results_message += f"{cam_nice_name}: {percentage:.2f}% of votes\n"
                     results_message += f"\n{remaining}s remaining..."
 
                 # Edit the message with updated vote counts and remaining time
@@ -395,14 +416,17 @@ class VotingCog(commands.Cog):
                 final_message = "Voting has ended! Here are the top 5 results:\n"
                 for cam, count in sorted_votes:
                     percentage = (count / total_votes) * 100
-                    final_message += f"{cam}: {percentage:.2f}% of votes\n"
+                    cam_nice_name = self.camera_name_to_nice_name(cam)
+                    final_message += f"{cam_nice_name}: {percentage:.2f}% of votes\n"
 
             await message.edit(content=final_message)
             await message.delete(delay=display_duration - duration)
 
             # Handle the results
             await self.handle_vote_results(ctx, sorted_votes, position_list)
+            await self.reset_auto_poll()
             self.poll_active = False
+
         except Exception as e:
             log.error(f"Caught exception {e}: \n{format_exc()}")
 
@@ -424,7 +448,7 @@ class VotingCog(commands.Cog):
 
                 log.info(f"Setting {camera_name} in position {position_name} by popular demand.")
                 nice_camera_name = self.bot.cameras.getByName(camera_name).nice_name
-                nice_position_name = self.bot.cameras.getByName(position_name).nice_name
+                nice_position_name = self.bot.positions.getByName(position_name).nice_name
                 await ctx.send(f"Setting {nice_camera_name} in position {nice_position_name} by popular demand.",
                                delete_after=self.bot.settings.discord.voting.display_duration - self.bot.settings.discord.voting.duration)
                 requestCameraInPosition(camera_name, position_name, access_level=access_level)

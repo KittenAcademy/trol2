@@ -24,8 +24,8 @@ RUN rm -fr venv
 ENV PATH="/app/.local/bin:$PATH"
 RUN python -m pip install --upgrade pip 
 
-RUN pip install -r obs-websocket-py/requirements.txt
-RUN pip install obs-websocket-py
+#RUN pip install -r obs-websocket-py/requirements.txt
+#RUN pip install obs-websocket-py
 RUN pip install -r requirements.txt
 RUN pip install .
 
