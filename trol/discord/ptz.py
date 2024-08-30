@@ -8,6 +8,7 @@ from io import BytesIO
 import base64
 from traceback import format_exc
 import functools
+import re
 
 from trol.shared.MQTTCommands import CameraCommands
 
@@ -28,6 +29,20 @@ VECTORS = {'left': (-0.2,0,0),
            'bigzoomout': (0,0,-1)
            }
 
+MACROS = {
+    'L': [-0.01,0,0], # left
+    'R': [0.01,0,0], # right
+    'U': [0,0.01,0], # up
+    'D': [0,-0.01,0], # down
+    'I': [0,0,0.01], # in
+    'O': [0,0,-0.01], # out
+}
+
+NUMBER_PATTERN = r'(?:\d+\.)?\d+' #1.234 or 1234
+DIRECTION_PATTERN = f'[{"".join(MACROS.keys())}]' # Any single letter from MACROS keys
+MACRO_PATTERN = re.compile(f'({NUMBER_PATTERN})({DIRECTION_PATTERN})') # e.g. 1.234L or 1234R
+FULL_MACRO_PATTERN = re.compile(f'^({MACRO_PATTERN.pattern})+$') # e.g. 1L2U3I
+
 # TODO: This is duplicated, should be in common code
 def are_coords_equal(c1, c2, tolerance=0.01):
     return all(abs(a - b) <= tolerance for a, b in zip(c1, c2))
@@ -37,6 +52,20 @@ def str_to_coords(vector_string):
     if len(floats) != 3:
         raise Exception(f"Got floats but not the right number of them.")
     return floats
+
+def parse_camvector(vector_string):
+    if vector_string in VECTORS:
+        return VECTORS[vector_string]
+    elif FULL_MACRO_PATTERN.fullmatch(vector_string):
+        vector = [0,0,0]
+        # Sum up individual vectors, e.g. 2L3U4I is 2*left + 3*up + 4*in
+        for match in MACRO_PATTERN.finditer(vector_string):
+            number, direction = match.groups()
+            vector = [a + b * float(number) for a, b in zip(vector, MACROS[direction])]
+        return tuple(vector)
+    else:
+        return str_to_coords(vector_string)
+
 
 class PTZCog(commands.Cog):
     def __init__(self, bot):
@@ -206,10 +235,7 @@ class PTZCog(commands.Cog):
     @trolRol()
     async def camvector(self, ctx, camera_name, coords):
         try:
-            if coords in VECTORS:
-                vector = VECTORS[coords]
-            else:
-                vector = str_to_coords(coords)
+            vector = parse_camvector(coords)
             log.debug(f"camvector {camera_name} to {vector}")
             camera = self.bot.cameras.getByName(camera_name)
             if camera is None:
