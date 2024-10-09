@@ -111,6 +111,7 @@ def get_time_strings(epoch_time):
 
 class VotingCog(commands.Cog):
     def __init__(self, bot):
+        super().__init__()
         self.bot = bot
         self.auto_poll_cameras.start()
         self.auto_poll_status_message = None
@@ -120,7 +121,7 @@ class VotingCog(commands.Cog):
     async def make_user_channel_message(self, text=""):
         c = self.bot.get_channel(int(self.bot.settings.discord.user_channel))
         if(c is None):
-            log.error(f"Can't get user channel! {bot.settings.discord.user_channel}")
+            log.error(f"Can't get user channel! {self.bot.settings.discord.user_channel}")
             return
         message = await c.send(text)
         return message
@@ -174,7 +175,6 @@ class VotingCog(commands.Cog):
     async def auto_poll_cameras(self):
         await self.bot.wait_until_ready()
         try:
-
             if self.poll_active:
                 return
 
@@ -203,7 +203,6 @@ class VotingCog(commands.Cog):
             log.debug("Beginning poll.")
             # We're clear, poll it.
             await self.reset_auto_poll()
-
             await self.poll_cameras(channel)
 
         except Exception as e: 
@@ -253,21 +252,34 @@ class VotingCog(commands.Cog):
         self.last_auto_poll = time()
         self.auto_poll_cameras.change_interval(seconds=10)
 
-    # position_names in legacy format.
-    async def poll_cameras(self, ctx, position_names=None, access_level='Discord user'):
+    def get_poll_positions_and_cameras(self, requested_positions = None, access_level='Discord user'):
         position_list = []
-        if position_names:
-            position_list = [self.bot.settings.legacy_position_prefix + position_name for position_name in position_names 
-                             if not self.bot.positions.positionIsLocked(self.bot.settings.legacy_position_prefix + position_name, access_level=access_level)]
+
+        # Ensure legacy format -- or not.
+        for position_name in requested_positions:
+            if position_name.startswith(self.bot.settings.legacy_position_prefix):
+                position_list.append(position_name)
+            else:
+                position_list.append(self.bot.settings.legacy_position_prefix + position_name)
+
+        # Eliminate locked positions
+        if position_list:
+            position_list = [position_name for position_name in position_list 
+                             if not self.bot.positions.positionIsLocked(position_name, access_level=access_level)]
         else:
             position_list = [position_name for position_name in self.bot.settings.discord.voting.positions
                              if not self.bot.positions.positionIsLocked(position_name, access_level=access_level)]
-        
-        if len(position_list) == 0:
-            await ctx.send("No vote possible currently (no positions eligible).")
-            return
 
-        # get subset of cameras allowed in position by config and by access level
+        # If a camera that's in-use can't be voted on (i.e. it's HIDDEN) then don't allow voting on that position.
+        # This will also prevent voting out an active autocam because (presumably) the autocam is set PRIVATE.
+        for position_name in position_list[:]:
+            active_camera_name = self.bot.positions.getByName(position_name).active
+            active_camera = self.bot.cameras.getByName(active_camera_name)
+            if not active_camera.ispublic or (active_camera.ishidden and access_level == 'Discord user'):
+                log.debug(f"Removing position {position_name} from poll because {active_camera_name} is unvotable.")
+                position_list.remove(position_name)
+
+        # get subset of cameras allowed in positions by config and by access level
         if access_level == 'admin':  # Admins aren't constrained by your petty rules.
             cameras_touse = getCameraThumbs(access_level).keys()
         else:
@@ -283,7 +295,16 @@ class VotingCog(commands.Cog):
             non_voting_active_cameras = [self.bot.positions.getByName(position).active for position in self.bot.settings.discord.voting.positions if position not in position_list]
             cameras_touse = [camera for camera in cameras_touse if camera not in non_voting_active_cameras]
 
-        log.debug(f"cameras to use: {cameras_touse}")
+        return position_list, cameras_touse
+
+    # position_names in legacy format.
+    async def poll_cameras(self, ctx, position_names=None, access_level='Discord user'):
+
+        position_list, cameras_touse = self.get_poll_positions_and_cameras(position_names, access_level)
+
+        if len(position_list) == 0:
+            await ctx.send("No vote possible currently (no positions eligible).")
+            return
 
         if len(cameras_touse) == 0:
             await ctx.send("No cameras are eligible to poll.", delete_after = 20)
@@ -432,28 +453,51 @@ class VotingCog(commands.Cog):
 
 
     async def handle_vote_results(self, ctx, sorted_votes, position_list, access_level='Discord user'):
-        for position_name in position_list:
-            if self.bot.positions.positionIsLocked(position_name, access_level=access_level):
-                continue
+        # In case the allowed cameras/positions have changed since we began:
+        position_list, eligible_cameras = self.get_poll_positions_and_cameras(position_list, access_level)
 
-            eligible_cameras = self.bot.settings.discord.voting.get('voting_camera_limits',{}).get(position_name, [])
-            for camera_name, votes in sorted_votes:
-                log.debug(f"Considering {position_name} for {camera_name}...")
-                if votes == 0:
-                    log.debug(f"{camera_name} got no votes.")
-                    break
-                if camera_name not in eligible_cameras:
-                    log.debug(f"{position_name} not eligible for {camera_name} only {eligible_cameras}")
-                    continue
+        # We assume here that the only positions we care about (all video positions) are in the 
+        # discord.voting.positions in settings.
+        active_camera_map = {self.bot.positions.getByName(position_name).active: position_name 
+                             for position_name in self.bot.settings.discord.voting.positions}
 
-                log.info(f"Setting {camera_name} in position {position_name} by popular demand.")
-                nice_camera_name = self.bot.cameras.getByName(camera_name).nice_name
-                nice_position_name = self.bot.positions.getByName(position_name).nice_name
-                await ctx.send(f"Setting {nice_camera_name} in position {nice_position_name} by popular demand.",
-                               delete_after=self.bot.settings.discord.voting.display_duration - self.bot.settings.discord.voting.duration)
-                requestCameraInPosition(camera_name, position_name, access_level=access_level)
-                sorted_votes.remove((camera_name, votes))
+        for camera_name, votes in sorted_votes:
+            log.debug(f"Considering {camera_name}...")
+            # Quit when we run out of positions
+            if len(position_list) == 0:
+                log.debug(f"End of positions.")
                 break
+            # Quit when we reach the end of votes
+            if votes == 0:
+                log.debug(f"{camera_name} got no votes.")
+                break
+            # Skip this camera if it's become ineligible since we started
+            if camera_name not in eligible_cameras:
+                log.debug(f"{camera_name} no longer eligible")
+                continue
+            # If this camera is already active in a position just keep it there
+            if camera_name in active_camera_map.keys():
+                position_list.remove(active_camera_map[camera_name])
+                continue
+ 
+            # if there is a position remanining where we can put this camera then do.
+            position_touse = None
+            for position_name in position_list:
+                if camera_name in self.bot.settings.discord.voting.voting_camera_limits[position_name]:
+                    position_touse = position_name
+                    break
+
+            if position_touse is None:
+                log.debug(f"Not using {camera_name} because no remaining position is eligible: {position_list}")
+                continue
+            
+            log.info(f"Setting {camera_name} in position {position_touse} by popular demand.")
+            nice_camera_name = self.bot.cameras.getByName(camera_name).nice_name
+            nice_position_name = self.bot.positions.getByName(position_touse).nice_name
+            await ctx.send(f"Setting {nice_camera_name} in position {nice_position_name} by popular demand.",
+                           delete_after=self.bot.settings.discord.voting.display_duration - self.bot.settings.discord.voting.duration)
+            requestCameraInPosition(camera_name, position_touse, access_level=access_level)
+            position_list.remove(position_touse)
 
     def create_grid_single(self, access_level='Discord user', extension='JPEG', eligible_cameras=None):
         public_camthumbs = getCameraThumbs(access_level)
@@ -548,6 +592,24 @@ class VotingCog(commands.Cog):
         if camera.nice_name:
             return camera.nice_name
         return camera_name
+
+    @commands.command()
+    @onlyChannel()
+    @trolRol()
+    async def enable_voting(self, ctx):
+        self.bot.settings.discord.voting.enable_autopoll = True
+        await ctx.send(f"Voting is now enabled.  It will run every {self.bot.settings.discord.voting.poll_interval} seconds.")
+
+    @commands.command()
+    @onlyChannel()
+    @trolRol()
+    async def disable_voting(self, ctx):
+        self.bot.settings.discord.voting.enable_autopoll = False
+        await ctx.send(f"Voting is now disabled.")
+
+
+
+
 
 
 async def setup(bot):

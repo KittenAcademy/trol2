@@ -62,6 +62,7 @@ class UtilityCog(commands.Cog):
             " $hidecamera CAM       = Hide camera from voters\n"
             " $unhidecamera CAM     = Unhide camera from voters\n"
             " $setnicename CAM NAME = Give a camera a user-friendly alias for voters\n"
+            " $enable_voting, $disable_voting = Start/stop autopolling for users.\n"
             "OBS Controls\n"
             " $stopstreaming        = Stop the live stream!\n"
             " $startstreaming       = Start the live stream!\n"

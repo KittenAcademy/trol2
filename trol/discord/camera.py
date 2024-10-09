@@ -90,15 +90,9 @@ class CameraCog(commands.Cog):
 
             camera_in_positions = get_positions_containing_camera(camera_name)
 
-            message = ""
-            if camera_in_positions:
-                message += f"{camera_name} is currently in positions '{', '.join(camera_in_positions)}'.\n"
-            else:
-                message += f"{camera_name} is not currently on stream.\n"
-            if camera.nice_name:
-                message += f"{camera_name} is a.k.a. '{camera.nice_name}'\n"
-            if camera.known_ptz_positions:
-                message += f"{camera_name} PTZ locations: " + ", ".join(camera.known_ptz_positions.keys())
+            message = "```"
+            message += self.get_caminfo_string(camera_name, camera)
+            message += "```"
 
             await ctx.send(message, file=discord.File(create_gif(self.bot.camthumbs.get(camera_name, [])), filename=f"camera {camera_name}.gif"))
         except Exception as e:
@@ -158,6 +152,7 @@ class CameraCog(commands.Cog):
     @onlyChannel()
     @trolRol()
     async def caminfo(self, ctx):
+        # TODO: camerainfo, positioninfo, etc.
         camerainfo = "```"
         for position_name, position in self.bot.positions.items():
             camerainfo += f"Position {position_name} currently showing {position.active}.\n"
@@ -171,35 +166,42 @@ class CameraCog(commands.Cog):
                     camerainfo += f"  Locked for {locked_for:.0f} seconds by {position.lock_level}\n"
 
         camerainfo += "\n"
-
-        for camera_name, camera in self.bot.cameras.items():
-            if not camera.ispublic:
-                continue
-            camerainfo += f"Camera {camera_name}"
-            if camera.nice_name:
-                camerainfo += f" a.k.a. '{camera.nice_name}'"
-            camerainfo += "\n"
-            in_locations = get_positions_containing_camera(camera_name)
-            if len(in_locations):
-                camerainfo += f"  is in positions: {in_locations}\n"
-            if camera.failure_count and camera.failure_count > 5:
-                camerainfo += f"  IS FAILING! {camera.failure_count} errors!\n"
-            if self.contact_age(camera) > 60:
-                nice_time = datetime.fromisoformat(camera.last_screenshot_timestamp).strftime("%Y-%m-%d %H:%M:%S")
-                camerainfo += f"  IS FAILING! Last contact {nice_time}.\n"
-            if self.bot.cameras.isCameraPTZLocked(camera_name, 'admin'):
-                camerainfo += f"  is PTZ Locked.\n"
-            if camera.ishidden:
-                camerainfo += f"  is HIDDEN.\n"
-            if camera.known_ptz_positions:
-                camerainfo += f"  has PTZ locations: " + ", ".join(camera.known_ptz_positions.keys()) + "\n"
-
         camerainfo += "```"
 
         await ctx.send(camerainfo)
 
+        for camera_name, camera in self.bot.cameras.items():
+            if not camera.ispublic:
+                continue
 
+            camerainfo = "```"
+            camerainfo += self.get_caminfo_string(camera_name, camera)
+            camerainfo += "```"
+            await ctx.send(camerainfo)
 
+    def get_caminfo_string(self, camera_name, camera):
+        if not camera.ispublic:
+            continue
+
+        camerainfo += f"Camera {camera_name}"
+        if camera.nice_name:
+            camerainfo += f" a.k.a. '{camera.nice_name}'"
+        camerainfo += "\n"
+        in_locations = get_positions_containing_camera(camera_name)
+        if len(in_locations):
+            camerainfo += f"  is in positions: {in_locations}\n"
+        if camera.failure_count and camera.failure_count > 5:
+            camerainfo += f"  IS FAILING! {camera.failure_count} errors!\n"
+        if self.contact_age(camera) > 60:
+            nice_time = datetime.fromisoformat(camera.last_screenshot_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+            camerainfo += f"  IS FAILING! Last contact {nice_time}.\n"
+        if self.bot.cameras.isCameraPTZLocked(camera_name, 'admin'):
+            camerainfo += f"  is PTZ Locked.\n"
+        if camera.ishidden:
+            camerainfo += f"  is HIDDEN.\n"
+        if camera.known_ptz_positions:
+            camerainfo += f"  has PTZ locations: " + ", ".join(camera.known_ptz_positions.keys()) + "\n"
+        return camerainfo
 
 async def setup(bot):
     await bot.add_cog(CameraCog(bot))

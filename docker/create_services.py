@@ -19,7 +19,7 @@ def create_docker_compose(systemnames, cameras, registry=None, configname=None, 
             "restart": "unless-stopped",
             "networks": [network_name]
         }
-        if configname is not None:
+        if configname:
             services[service_name]["configs"] = [{ "source": configname, "target": "/app/config.yaml"}]
 
     # Add system services
@@ -64,7 +64,10 @@ def main():
     parser.add_argument("--imageversion", type=str, default='latest', help="Image version tag, defaults to 'latest'")
 
     args = parser.parse_args()
-    cameras = args.cameras.split(',')
+    if args.cameras:
+        cameras = args.cameras.split(',')
+    else:
+        cameras = []
     systemnames = ["obs", "newsrunner", "discord", "ptzhandler", "autocam"]
 
     create_docker_compose(systemnames, cameras, registry=args.registry, configname=args.configname, image_version=args.imageversion)

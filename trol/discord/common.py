@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from trol.shared.logger import setup_logger
+from trol.shared.logger import setup_logger, set_debug
 from io import BytesIO
 from base64 import b64decode
 from PIL import Image
@@ -8,6 +8,7 @@ from time import time
 
 
 log = setup_logger(__name__)
+set_debug(log)
 
 bot = None;
 
@@ -23,13 +24,19 @@ def trolRol(role = None):
         role = bot.settings.discord.admin_role
     """ For checking whether a user has the 'trol role' - is admin """
     async def predicate(ctx):
-        for r in ctx.author.roles:
-            if r.name == role:
-                # TODO: IDK, change this?
-                # track when the last admin command was run for use by autopoll:
-                bot.last_admin_activity = time()
-                return True
-        log.debug("Role check fail.")
+        try:
+            commands_to_update_activity = ['camvector', 'camchange']
+            for r in ctx.author.roles:
+                # TODO: Maybe temporary, might be better to just block changed positions?
+                if r.name == role:
+                    if ctx.command.name in commands_to_update_activity:
+                        # track when the last admin command was run for use by autopoll:
+                        bot.last_admin_activity = time()
+                    return True
+            log.debug("Role check fail.")
+            return False
+        except Exception as e:
+            log.error(f"Oh no! Major problem in role check! {e}")
         return False
     return commands.check(predicate)
 
@@ -39,10 +46,13 @@ def onlyChannel(channel_id = None):
         channel_id = int(bot.settings.discord.admin_channel)
     """ Only allow on a particular channel. """
     async def predicate(ctx):
-        if(ctx.channel.id == channel_id):
-            return True
-        log.debug(f"message channel is {ctx.channel.id} but we expect {bot.settings.discord['admin_channel']}")
-        return False
+        try:
+            if(ctx.channel.id == channel_id):
+                return True
+            log.debug(f"message channel is {ctx.channel.id} but we expect {bot.settings.discord['admin_channel']}")
+            return False
+        except Exception as e:
+            log.error(f"Exception in onlyChannel predicate: {e}")
     return commands.check(predicate)
 
 async def send_to_channel(message, channel=None, filedata=None, filename="unknown.gif", duration=None):

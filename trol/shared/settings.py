@@ -8,7 +8,7 @@ import yaml
 import json
 import argparse
 import argcomplete
-
+from traceback import format_exc
 
 from trol.shared.logger import setup_logger, set_debug
 from collections.abc import MutableMapping
@@ -19,30 +19,41 @@ log = setup_logger(__name__)
 #set_debug(log)
 
 class ConfigNode(MutableMapping):
-    def __init__(self, data = None):
+    def __init__(self, data = None, on_change = None):
+        self._on_change_callback = on_change
         self._load_data(data)
 
-    def _load_data(self, data = None):
+    def _load_data(self, data=None):
         if data is None:
             data = {}
         self._data = {}
         for key, value in data.items():
             if isinstance(value, dict):
-                self._data[key] = ConfigNode(value)
+                self._data[key] = ConfigNode(value, on_change=self._on_change_callback)
             else:
                 self._data[key] = value
 
+    def set_on_change(self, on_change):
+        self._on_change_callback = on_change
+        # Propagate to all sub-nodes
+        for value in self._data.values():
+            if isinstance(value, ConfigNode):
+                value.set_on_change(on_change)
+    
     def isempty(self):
         return not bool(self._data)
 
     def __getattr__(self, item):
-        try:
-            if item.startswith('_'):
-                super().__getattr__(item)
+        if item.startswith('_'):
+            if item in self.__dict__:
+                return self.__dict__[item]
             else:
+                raise AttributeError(f"'ConfigNode' object has no attribute '{item}'")
+        else:
+            try:
                 return self._data[item]
-        except KeyError:
-            raise AttributeError(f"'ConfigNode' object has no attribute '{item}'")
+            except KeyError:
+                raise AttributeError(f"'ConfigNode' object has no attribute '{item}'")
 
     def __getitem__(self, item):
         return self._data[item]
@@ -55,27 +66,46 @@ class ConfigNode(MutableMapping):
             super().__setattr__(key, value)
         else:
             if isinstance(value, dict):
-                self._data[key] = ConfigNode(value)
+                self._data[key] = ConfigNode(value, on_change=self._on_change_callback)
             else:
                 self._data[key] = value
+            if self._on_change_callback:
+                try:
+                    self._on_change_callback(key, value)
+                except Exception as e:
+                    log.warn(f"Ignored exception in on_change callback: {e}: {format_exc()}")
 
     def __setitem__(self, key, value):
         if key.startswith('_'):
             super().__setattr__(key, value)
         else:
             if isinstance(value, dict):
-                self._data[key] = ConfigNode(value)
+                self._data[key] = ConfigNode(value, on_change=self._on_change_callback)
             else:
                 self._data[key] = value
+            if self._on_change_callback:
+                try:
+                    self._on_change_callback(key, value)
+                except Exception as e:
+                    log.warn(f"Ignored exception in on_change callback: {e}: {format_exc()}")
 
     def __delattr__(self, key):
         try:
             del self._data[key]
+            try:
+                self._on_change_callback(key, value)
+            except Exception as e:
+                log.warn(f"Ignored exception in on_change callback: {e}: {format_exc()}")
         except KeyError:
             raise AttributeError(f"'ConfigNode' object has no attribute '{key}'")
 
     def __delitem__(self, key):
         del self._data[key]
+        try:
+            self._on_change_callback(key, value)
+        except Exception as e:
+            log.warn(f"Ignored exception in on_change callback: {e}: {format_exc()}")
+
 
     def __iter__(self):
         return iter(self._data)
@@ -152,6 +182,7 @@ class Settings(ConfigNode):
         self._topic = topic
         self._mqtt_var = MQTTVariable(self._mqtt, topic)
         self._mqtt_var.add_callback(lambda: self.update_from_mqtt())
+        self.set_on_change(lambda _key, _value: self.perform_sync())
 
     def perform_sync(self):
         """ Send our current state into the MQTT """
@@ -159,8 +190,7 @@ class Settings(ConfigNode):
 
     def update_from_mqtt(self):
         """ Update our current state from MQTT """
-        # TODO: Consider whether this should be a merge or just replace our contents with mqtt
-        # or whether it matters
+        # NOTE: Merging does not trigger on_change and that's how we want it to be.
         log.debug(f"{self._singleton_name} merging from MQTT...")
         self.merge(json.loads(self._mqtt_var.value))
 

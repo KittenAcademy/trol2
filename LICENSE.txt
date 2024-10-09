@@ -1,8 +1,7 @@
 trol is all of the code and resources published under this repository, *except*:
-1. The obs-websocket-py project, included with modifications from https://github.com/Elektordi/obs-websocket-py
-   see the obs-websocket-py subdirectory for its license (MIT) and other information.
-2. Copies of "mqtt-min.js" provided for your convenience by MQTT.js.  See https://github.com/mqttjs and https://github.com/mqttjs/MQTT.js
+1. Copies of "mqtt-min.js" provided for your convenience by MQTT.js.  See https://github.com/mqttjs and https://github.com/mqttjs/MQTT.js
    for licensing (MIT) and other information.
+2. There is no 2.
 
 trol is Copyright 2024, Chris "Mr. A" Jansen.
 
